@@ -1,4 +1,4 @@
 {
   "xpinstall.signatures.required": false,
-  "extensions.@loci.sdk.console.logLevel": "info"
+  "extensions.@loci.sdk.console.logLevel": "debug"
 }

@@ -9,6 +9,8 @@ Cu.import("resource://gre/modules/Task.jsm");
 
 let STORAGE;
 
+const FILE_CONTENT = "Lorem ipsum dolor sit amet, no dolor epicuri posidonium usu, pro soluta ancillae ad. Est tibique patrioque temporibus eu, ei duo discere diceret denique. Dicam dolores constituam cum ea. Mei illum ipsum iriure ea. Ad tempor persequeris comprehensam cum, duo et quidam mentitum nominavi.";
+
 exports["test that tables are created"] = function*(assert) {
   let tableCheckSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name=:name";
   let pagesTable = yield STORAGE.asyncExecuteCached("check pages table existence", tableCheckSQL, {
@@ -23,14 +25,14 @@ exports["test that tables are created"] = function*(assert) {
 };
 
 exports["test inserting, selecting and deleting a page"] = function*(assert) {
-  const insertPage = `INSERT INTO moz_pages (url, path, expiry, createdAt, remote)
-                      VALUES (:url, :path, :expiry, :createdAt, :remote);`;
+  const insertPage = `INSERT INTO moz_pages (url, path, maxAge, createdAt, remote)
+                      VALUES (:url, :path, :maxAge, :createdAt, :remote);`;
   const deletePage = "DELETE FROM moz_pages WHERE url = :url;";
 
   let requestPage = Task.async(function*(url) {
-    const selectPage = "SELECT url, path, expiry, createdAt, remote FROM moz_pages WHERE url = :url;";
+    const selectPage = "SELECT url, path, maxAge, createdAt, remote FROM moz_pages WHERE url = :url;";
     return yield STORAGE.asyncExecuteCached("select page", selectPage, {
-      columns: ["url", "path", "expiry", "createdAt", "remote"],
+      columns: ["url", "path", "maxAge", "createdAt", "remote"],
       params: {url},
     });
   });
@@ -38,7 +40,7 @@ exports["test inserting, selecting and deleting a page"] = function*(assert) {
   let params = {
     url: "http://foo.bar",
     path: "1234",
-    expiry: 1467225044,
+    maxAge: 1467225044,
     createdAt: null,
     remote: 0};
 
@@ -89,6 +91,32 @@ exports["test inserting, selecting and deleting a task"] = function*(assert) {
   yield STORAGE.asyncExecuteCached("delete task", deleteTask, {params: {id: params.id}});
   task = yield requestTask(params.url);
   assert.equal(task.length, 0, "The table is empty again.");
+};
+
+exports["test saving a file and reading from it"] = function*(assert) {
+  const filename = "testfile";
+  yield Storage.asyncSaveFile(filename, FILE_CONTENT);
+  let fileContent = yield Storage.asyncGetFile(filename);
+  assert.equal(fileContent, FILE_CONTENT);
+  yield Storage.asyncRemoveFile(filename);
+};
+
+exports["test reading from an inexistent file gets rejected"] = function*(assert) {
+  const file = yield Storage.asyncGetFile("no-file-here");
+  assert.equal(file, null, "Returned null for an inexistent file");
+};
+
+exports["test saving to existing file overwrites"] = function*(assert) {
+  const filename = "testfile";
+  yield Storage.asyncSaveFile(filename, FILE_CONTENT);
+  let fileContent = yield Storage.asyncGetFile(filename);
+  assert.equal(fileContent, FILE_CONTENT);
+
+  yield Storage.asyncSaveFile(filename, FILE_CONTENT.toUpperCase());
+  let uppercaseFileContent = yield Storage.asyncGetFile(filename);
+  assert.equal(uppercaseFileContent, FILE_CONTENT.toUpperCase());
+  assert.notEqual(uppercaseFileContent, fileContent);
+  yield Storage.asyncRemoveFile(filename);
 };
 
 before(exports, function*() {
